@@ -18,10 +18,10 @@ sc.api_call(
 
 if sc.rtm_connect():
     while True:
-        stuff = sc.rtm_read()
+        event = sc.rtm_read()
+        print(event)
 
-        if (len(stuff) > 0):
-            print(len(stuff))
+        time.sleep(1)
 else:
     print("Connection Failed")
 
