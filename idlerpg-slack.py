@@ -1,6 +1,8 @@
 import time
 import os
 import logging
+import pickle
+import copy
 
 from dotenv import load_dotenv
 
@@ -13,7 +15,7 @@ class IdleRpgBot():
     time users are active in the rpg channel, and will respond to commands.
     """
 
-    def __init__(self, slack_token, rpg_channel_name):
+    def __init__(self, slack_token, rpg_channel_name, db_filename):
         """Return an IdleRPG Slack bot
 
         Args:
@@ -25,7 +27,10 @@ class IdleRpgBot():
         self._id = None
         self._rpg_channel_id = None
         self._rpg_channel_name = rpg_channel_name
+        self._db_filename = db_filename
         self._users = {}
+
+        self.load()
 
     def connect(self):
         """Initiate a connection with Slack"""
@@ -39,6 +44,26 @@ class IdleRpgBot():
                 self._handle_event(event)
             time.sleep(READ_EVENT_PAUSE)
 
+    def save(self):
+        """Save the current user information to disk
+
+        A clone is created of the user copy before saving, so that all users
+        can be set to offline before being saved to disk
+        """
+        current_users = copy.deepcopy(self._users)
+        for user_id, user in current_users.items():
+            if user['active']:
+                set_offline(current_users, user_id)
+
+        with open(self._db_filename, 'wb') as db_file:
+            pickle.dump(current_users, db_file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load(self):
+        """Load user information from disk"""
+        if os.path.isfile(self._db_filename):
+            with open(self._db_filename, 'rb') as db_file:
+                self._users = pickle.load(db_file)
+
     def _post_connection_init(self):
         self_user = self._api.get_self()
 
@@ -46,37 +71,33 @@ class IdleRpgBot():
         self._id = self_user['id']
 
         rpg_channel = self._api.get_channel(self._rpg_channel_name)
-        member_ids = self._api.get_channel_users(rpg_channel['id'])
+        self._rpg_channel_id = rpg_channel['id']
+        self._update_all_users()
 
-        for member_id in member_ids:
-            self._user_update(member_id)
-
-    def _user_update(self, id):
-        if not id in self._users:
-            user = self._api.get_user_info(id)
+    def _update_user(self, user_id):
+        if not user_id in self._users:
+            user = self._api.get_user_info(user_id)
 
             if user['is_bot']:
                 return
 
-            self._users[id] = {
+            self._users[user_id] = {
                 'profile': user['profile'],
                 'active': False,
                 'first_seen': None,
                 'total': 0
             }
 
-        active = self._api.is_user_active(id)
+        active = self._api.is_user_active(user_id)
 
         if active:
-            if not self._users[id]['active']:
-                self._users[id]['active'] = True
-                self._users[id]['first_seen'] = time.time()
+            if not self._users[user_id]['active']:
+                set_online(self._users, user_id)
+
         else:
-            if self._users[id]['active']:
-                self._users[id]['active'] = False
-                self._users[id]['total'] += time.time() - self._users[id]['first_seen']
-                self._users[id]['first_seen'] = None
-    
+            if self._users[user_id]['active']:
+                set_offline(self._users, user_id)
+
     def _handle_event(self, event):
         logging.debug('Recieved event: {}'.format(event))
         if event['type'] == 'message':
@@ -112,14 +133,34 @@ class IdleRpgBot():
                 if user['active']:
                     total += time.time() - user['first_seen']
                 scores.append('{}: {}'.format(name, total))
-            self._api.send_message(event['channel'], 'Scores:\n{}'.format('\n'.join(scores))
-            )
+            self._api.send_message(event['channel'], 'Scores:\n{}'.format('\n'.join(scores)))
+        elif command.lower() == 'save':
+            self.save()
+        elif command.lower() == 'load':
+            self.load()
+            self._update_all_users()
+
+    def _update_all_users(self):
+        member_ids = self._api.get_channel_users(self._rpg_channel_id)
+
+        for member_id in member_ids:
+            self._update_user(member_id)
+
 
     def _handle_presence_change(self, event):
-        self._user_update(event['user'])
+        self._update_user(event['user'])
 
     def _hello(self, channel_id):
         self._api.send_message(channel_id, 'Hello from Python! :tada:')
+
+def set_online(users, user_id):
+    users[user_id]['active'] = True
+    users[user_id]['first_seen'] = time.time()
+
+def set_offline(users, user_id):
+    users[user_id]['active'] = False
+    users[user_id]['total'] += time.time() - users[user_id]['first_seen']
+    users[user_id]['first_seen'] = None
 
 def main():
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
@@ -127,8 +168,9 @@ def main():
 
     slack_token = os.environ['SLACK_API_TOKEN']
     rpg_channel_name = 'general'
+    db_filename = 'users.db'
 
-    bot = IdleRpgBot(slack_token, rpg_channel_name)
+    bot = IdleRpgBot(slack_token, rpg_channel_name, db_filename)
     bot.connect()
 
 if __name__ == '__main__':
