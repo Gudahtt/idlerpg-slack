@@ -1,7 +1,9 @@
 from slackclient import SlackClient
-import time, os, pprint, sys
+import time, os, pprint, sys, logging
 
 from dotenv import load_dotenv
+
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
 load_dotenv('.env')
 
@@ -151,7 +153,7 @@ def main():
                 handle_event(event)
             time.sleep(1)
     else:
-        print("Connection Failed")
+        logging.error("Connection Failed")
         sys.exit(1)
 
 if __name__ == '__main__':
