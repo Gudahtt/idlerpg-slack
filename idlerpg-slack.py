@@ -1,5 +1,5 @@
 from slackclient import SlackClient
-import time, os, pprint
+import time, os, pprint, sys
 
 from dotenv import load_dotenv
 
@@ -152,5 +152,6 @@ def main():
             time.sleep(1)
     else:
         print("Connection Failed")
+        sys.exit(1)
 
 main()
