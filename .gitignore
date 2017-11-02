@@ -3,3 +3,6 @@
 
 # VSCode
 .vscode
+
+# Python
+*.pyc
