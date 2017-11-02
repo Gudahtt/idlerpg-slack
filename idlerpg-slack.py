@@ -167,8 +167,8 @@ def main():
     load_dotenv('.env')
 
     slack_token = os.environ['SLACK_API_TOKEN']
-    rpg_channel_name = 'general'
-    db_filename = 'users.db'
+    rpg_channel_name = os.environ.get('IDLE_RPG_CHANNEL', 'general')
+    db_filename = os.environ.get('IDLE_RPG_DB', 'users.db')
 
     bot = IdleRpgBot(slack_token, rpg_channel_name, db_filename)
     bot.connect()
