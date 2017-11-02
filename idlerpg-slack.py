@@ -30,7 +30,7 @@ class IdleRpgBot():
                     self._handle_event(event)
                 time.sleep(1)
         else:
-            raise RuntimeError("Connection Failed")
+            raise RuntimeError('Connection Failed')
 
     def _post_connection_init(self):
         login_data = self._sc.server.login_data
@@ -39,7 +39,7 @@ class IdleRpgBot():
         self._id = login_data['self']['id']
 
         channels_list_response = self._sc.api_call(
-            "channels.list"
+            'channels.list'
         )
         channels = channels_list_response['channels']
 
@@ -49,10 +49,10 @@ class IdleRpgBot():
                 rpg_channel = channel
                 break
         else:
-            raise RuntimeError("Channel {} not found".format(name))
+            raise RuntimeError('Channel {} not found'.format(name))
 
         channel_users_response = self._sc.api_call(
-            "conversations.members",
+            'conversations.members',
             channel=channel['id']
         )
 
@@ -64,7 +64,7 @@ class IdleRpgBot():
     def _user_update(self, id):
         if not id in self._users:
             user_info_response = self._sc.api_call(
-                "users.info",
+                'users.info',
                 user=id
             )
 
@@ -81,7 +81,7 @@ class IdleRpgBot():
             }
 
         user_presence_response = self._sc.api_call(
-            "users.getPresence",
+            'users.getPresence',
             user=id
         )
 
@@ -98,7 +98,7 @@ class IdleRpgBot():
                 self._users[id]['first_seen'] = None
     
     def _handle_event(self, event):
-        logging.debug("Recieved event: {}".format(event))
+        logging.debug('Recieved event: {}'.format(event))
         if event['type'] == 'message':
             self._handle_message(event)
         elif event['type'] == 'presence_change':
@@ -134,8 +134,8 @@ class IdleRpgBot():
                     total += time.time() - user['first_seen']
                 scores.append('{}: {}'.format(name, total))
             self._sc.api_call(
-                "chat.postMessage",
-                channel="#general",
+                'chat.postMessage',
+                channel='#general',
                 text='Scores:\n{}'.format('\n'.join(scores))
             )
 
@@ -144,9 +144,9 @@ class IdleRpgBot():
     
     def _hello(self, channel):
         self._sc.api_call(
-            "chat.postMessage",
+            'chat.postMessage',
             channel=channel,
-            text="Hello from Python! :tada:"
+            text='Hello from Python! :tada:'
         )
 
 def main():
