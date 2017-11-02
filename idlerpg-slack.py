@@ -3,158 +3,161 @@ import time, os, pprint, sys, logging
 
 from dotenv import load_dotenv
 
-logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
+class IdleRpgBot():
+    """A Slack bot for playing IdleRPG. An IdleRPG Slack bot will track the
+    time users are active in the rpg channel, and will respond to commands.
+    """
 
-load_dotenv('.env')
+    def __init__(self, slack_token, rpg_channel_name):
+        """Return an IdleRPG Slack bot with with the token *slack_token* for
+        the channel *rpg_channel_name*."""
+        self._sc = SlackClient(slack_token)
+        self._name = None
+        self._id = None
+        self._rpg_channel_id = None
+        self._rpg_channel_name = rpg_channel_name
+        self._users = {}
 
-slack_token = os.environ["SLACK_API_TOKEN"]
-active_channel_name = 'general'
+    def connect(self):
+        """Initiate a connection with Slack"""
+        if self._sc.rtm_connect():
+            self._post_connection_init()
 
-bot_id = None
-bot_name = None
+            while True:
+                events = self._sc.rtm_read()
 
-sc = SlackClient(slack_token)
+                for event in events:
+                    self._handle_event(event)
+                time.sleep(1)
+        else:
+            raise RuntimeError("Connection Failed")
 
-pp = pprint.PrettyPrinter(indent=4)
+    def _post_connection_init(self):
+        login_data = self._sc.server.login_data
 
-users = {}
+        self._name = login_data['self']['name']
+        self._id = login_data['self']['id']
 
-def hello(channel):
-    sc.api_call(
-        "chat.postMessage",
-        channel=channel,
-        text="Hello from Python! :tada:"
-    )
+        channels_list_response = self._sc.api_call(
+            "channels.list"
+        )
+        channels = channels_list_response['channels']
 
-def handle_event(event):
-    if event["type"] == "message":
-        handle_message(event)
-    elif event["type"] == "presence_change":
-        handle_presence_change(event)
+        rpg_channel = None
+        for channel in channels:
+            if (channel['name'] == self._rpg_channel_name):
+                rpg_channel = channel
+                break
+        else:
+            raise RuntimeError("Channel {} not found".format(name))
 
-def handle_message(event):
-    print(event)
-    text = event["text"]
-    if text.startswith('<@{}>'.format(bot_id)):
-        chunks = text.split()
-
-        if len(chunks) > 1:
-            args = []
-            if len(chunks) > 2:
-                args = chunks[2:]
-            handle_command(event, chunks[1], args)
-
-def handle_command(event, command, args):
-    if command.lower() == "hello" or command.lower() == "hi":
-        hello(event['channel'])
-    elif command.lower() == "scores":
-        scores = []
-        for user_id, user in users.items():
-            name = user['profile']['display_name']
-            if len(name) == 0:
-                name = user['profile']['real_name']
-            if len(name) == 0:
-                name = user['profile']['email']
-
-            total = user['total']
-
-            if user['active']:
-                total += time.time() - user['first_seen']
-            scores.append('{}: {}'.format(name, total))
-        sc.api_call(
-            "chat.postMessage",
-            channel="#general",
-            text='Scores:\n{}'.format('\n'.join(scores))
+        channel_users_response = self._sc.api_call(
+            "conversations.members",
+            channel=channel['id']
         )
 
+        member_ids = channel_users_response['members']
 
-def handle_presence_change(event):
-    user_update(event['user'])
+        for member_id in member_ids:
+            self._user_update(member_id)
 
-def get_channel_by_name(channels, name):
-    for channel in channels:
-        if (channel['name'] == name):
-            return channel
-    else:
-        raise RuntimeError("Channel {} not found".format(name))
+    def _user_update(self, id):
+        if not id in self._users:
+            user_info_response = self._sc.api_call(
+                "users.info",
+                user=id
+            )
 
-def user_update(id):
-    timestamp = time.time()
+            user = user_info_response['user']
 
-    if not id in users:
-        user_info_response = sc.api_call(
-            "users.info",
+            if user['is_bot']:
+                return
+
+            self._users[id] = {
+                'profile': user['profile'],
+                'active': False,
+                'first_seen': None,
+                'total': 0
+            }
+
+        user_presence_response = self._sc.api_call(
+            "users.getPresence",
             user=id
         )
 
-        user = user_info_response["user"]
+        active = user_presence_response['presence'] == 'active'
 
-        if user['is_bot']:
-            return
+        if active:
+            if not self._users[id]['active']:
+                self._users[id]['active'] = True
+                self._users[id]['first_seen'] = time.time()
+        else:
+            if self._users[id]['active']:
+                self._users[id]['active'] = False
+                self._users[id]['total'] += time.time() - self._users[id]['first_seen']
+                self._users[id]['first_seen'] = None
+    
+    def _handle_event(self, event):
+        logging.debug("Recieved event: {}".format(event))
+        if event['type'] == 'message':
+            self._handle_message(event)
+        elif event['type'] == 'presence_change':
+            self._handle_presence_change(event)
 
-        users[id] = {
-            'profile': user["profile"],
-            'active': False,
-            'first_seen': None,
-            'total': 0
-        }
+    def _handle_message(self, event):
+        text = event['text']
+        print(self._id)
+        if text.startswith('<@{}>'.format(self._id)):
+            chunks = text.split()
 
-    user_presence_response = sc.api_call(
-        "users.getPresence",
-        user=id
-    )
+            if len(chunks) > 1:
+                args = []
+                if len(chunks) > 2:
+                    args = chunks[2:]
+                self._handle_command(event, chunks[1], args)
 
-    active = user_presence_response['presence'] == 'active'
+    def _handle_command(self, event, command, args):
+        if command.lower() == 'hello' or command.lower() == 'hi':
+            self._hello(event['channel'])
+        elif command.lower() == 'scores':
+            scores = []
+            for user_id, user in self._users.items():
+                name = user['profile']['display_name']
+                if len(name) == 0:
+                    name = user['profile']['real_name']
+                if len(name) == 0:
+                    name = user['profile']['email']
 
-    if active:
-        if not users[id]['active']:
-            users[id]['active'] = True
-            users[id]['first_seen'] = timestamp
-    else:
-        if users[id]['active']:
-            users[id]['active'] = False
-            users[id]['total'] += time.time() - users[id]['first_seen']
-            users[id]['first_seen'] = None
+                total = user['total']
 
+                if user['active']:
+                    total += time.time() - user['first_seen']
+                scores.append('{}: {}'.format(name, total))
+            self._sc.api_call(
+                "chat.postMessage",
+                channel="#general",
+                text='Scores:\n{}'.format('\n'.join(scores))
+            )
 
-def init(login_data):
-    global bot_name
-    global bot_id
-
-    bot_name = login_data['self']['name']
-    bot_id = login_data['self']['id']
-
-    channels_list_response = sc.api_call(
-        "channels.list"
-    )
-
-    channels = channels_list_response['channels']
-
-    channel = get_channel_by_name(channels, active_channel_name)
-
-    channel_users_response = sc.api_call(
-        "conversations.members",
-        channel=channel["id"]
-    )
-
-    member_ids = channel_users_response['members']
-
-    for member_id in member_ids:
-        user_update(member_id)
+    def _handle_presence_change(self, event):
+        self._user_update(event['user'])
+    
+    def _hello(self, channel):
+        self._sc.api_call(
+            "chat.postMessage",
+            channel=channel,
+            text="Hello from Python! :tada:"
+        )
 
 def main():
-    if sc.rtm_connect():
-        login_data = sc.server.login_data
-        init(login_data)
-        while True:
-            events = sc.rtm_read()
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
+    load_dotenv('.env')
 
-            for event in events:
-                handle_event(event)
-            time.sleep(1)
-    else:
-        logging.error("Connection Failed")
-        sys.exit(1)
+    slack_token = os.environ['SLACK_API_TOKEN']
+    rpg_channel_name = 'general'
+
+    bot = IdleRpgBot(slack_token, rpg_channel_name)
+    bot.connect()
 
 if __name__ == '__main__':
     main()
