@@ -57,8 +57,12 @@ class IdleRpgBot():
 
     def load(self):
         """Load user information from disk"""
-        self._users = db.load(self._db_filename)
-        logging.debug('Users loaded from {}'.format(self._db_filename))
+        saved_users = db.load(self._db_filename)
+        if saved_users:
+            self._users = saved_users
+            logging.debug('Users loaded from {}'.format(self._db_filename))
+        else:
+            logging.debug('No database found at {}; load skipped'.format(self._db_filename))
 
     def _post_connection_init(self):
         self_user = self._api.get_self()
