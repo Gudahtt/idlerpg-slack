@@ -1,10 +1,12 @@
 import os
 import logging
+import sys
 
 from dotenv import load_dotenv
 from bot import IdleRpgBot
 
 def main():
+    print(sys.argv)
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
     load_dotenv('.env')
 
@@ -14,6 +16,3 @@ def main():
 
     bot = IdleRpgBot(slack_token, rpg_channel_name, db_filename)
     bot.connect()
-
-if __name__ == '__main__':
-    main()
