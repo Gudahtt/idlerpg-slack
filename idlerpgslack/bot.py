@@ -117,9 +117,10 @@ class IdleRpgBot():
                 self._handle_command(event, chunks[1], args)
 
     def _handle_command(self, event, command, args):
-        if command.lower() == 'hello' or command.lower() == 'hi':
+        command = command.lower()
+        if command == 'hello' or command == 'hi':
             self._hello(event['channel'])
-        elif command.lower() == 'scores':
+        elif command == 'scores':
             scores = []
             for user_id, user in self._users.items():
                 name = user['profile']['display_name']
@@ -134,9 +135,9 @@ class IdleRpgBot():
                     total += time.time() - user['first_seen']
                 scores.append('{}: {}'.format(name, total))
             self._api.send_message(event['channel'], 'Scores:\n{}'.format('\n'.join(scores)))
-        elif command.lower() == 'save':
+        elif command == 'save':
             self.save()
-        elif command.lower() == 'load':
+        elif command == 'load':
             self.load()
             self._update_all_users()
 
