@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from bot import IdleRpgBot
 
 def main():
-    print(sys.argv)
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
     load_dotenv('.env')
 
