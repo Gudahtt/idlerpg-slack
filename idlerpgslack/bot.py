@@ -111,10 +111,7 @@ class IdleRpgBot():
             chunks = text.split()
 
             if len(chunks) > 1:
-                args = []
-                if len(chunks) > 2:
-                    args = chunks[2:]
-                self._handle_command(event, chunks[1], args)
+                self._handle_command(event, chunks[1], chunks[2:])
 
     def _handle_command(self, event, command, args):
         command = command.lower()
