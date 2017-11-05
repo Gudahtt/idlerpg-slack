@@ -1,12 +1,12 @@
 import time
 import os
 import logging
-import pickle
 import copy
 
 from dotenv import load_dotenv
 
 from api import SlackApiClient
+import db
 
 READ_EVENT_PAUSE = .1
 
@@ -55,14 +55,13 @@ class IdleRpgBot():
             if user['active']:
                 set_offline(current_users, user_id)
 
-        with open(self._db_filename, 'wb') as db_file:
-            pickle.dump(current_users, db_file, protocol=pickle.HIGHEST_PROTOCOL)
+        db.save(self._db_filename, current_users)
+        logging.debug('Users saved to {}'.format(self._db_filename))
 
     def load(self):
         """Load user information from disk"""
-        if os.path.isfile(self._db_filename):
-            with open(self._db_filename, 'rb') as db_file:
-                self._users = pickle.load(db_file)
+        self._users = db.load(self._db_filename)
+        logging.debug('Users loaded from {}'.format(self._db_filename))
 
     def _post_connection_init(self):
         self_user = self._api.get_self()
