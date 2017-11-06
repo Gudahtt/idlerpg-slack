@@ -45,13 +45,10 @@ class SlackApiClient():
 
         channels = response['channels']
 
-        for channel in channels:
-            if (channel['name'] == name):
-                return channel
-        else:
+        try:
+            return next(channel for channel in channels if channel['name'] == name)
+        except StopIteration:
             raise RuntimeError('Channel {} not found'.format(name))
-
-        return channel
 
     def get_channel_users(self, channel_id):
         """Return the list of users in the channel with the id given"""

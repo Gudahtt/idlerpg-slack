@@ -1,12 +1,12 @@
 import os
 import logging
-import sys
 
 from dotenv import load_dotenv
 
 from .bot import IdleRpgBot
 
 def main():
+    """Starts IdleRPG Slack bot"""
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
     load_dotenv('.env')
 

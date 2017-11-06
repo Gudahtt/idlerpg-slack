@@ -53,16 +53,16 @@ class IdleRpgBot():
                 set_offline(current_users, user_id)
 
         db.save(self._db_filename, current_users)
-        logging.debug('Users saved to {}'.format(self._db_filename))
+        logging.debug('Users saved to %s', self._db_filename)
 
     def load(self):
         """Load user information from disk"""
         saved_users = db.load(self._db_filename)
         if saved_users:
             self._users = saved_users
-            logging.debug('Users loaded from {}'.format(self._db_filename))
+            logging.debug('Users loaded from %s', self._db_filename)
         else:
-            logging.debug('No database found at {}; load skipped'.format(self._db_filename))
+            logging.debug('No database found at %s; load skipped', self._db_filename)
 
     def _post_connection_init(self):
         self_user = self._api.get_self()
@@ -99,7 +99,7 @@ class IdleRpgBot():
                 set_offline(self._users, user_id)
 
     def _handle_event(self, event):
-        logging.debug('Recieved event: {}'.format(event))
+        logging.debug('Recieved event: %s', event)
         if event['type'] == 'message':
             self._handle_message(event)
         elif event['type'] == 'presence_change':
@@ -120,11 +120,11 @@ class IdleRpgBot():
             self._hello(event['channel'])
         elif command == 'scores':
             scores = []
-            for user_id, user in self._users.items():
+            for user in self._users.values():
                 name = user['profile']['display_name']
-                if len(name) == 0:
+                if not name:
                     name = user['profile']['real_name']
-                if len(name) == 0:
+                if not name:
                     name = user['profile']['email']
 
                 total = user['total']
@@ -141,21 +141,27 @@ class IdleRpgBot():
         elif command == "api":
             try:
                 method = args.pop(0)
-            except:
-                self._api.send_message(event['channel'], 'API method missing.\nUsage: `api method [argName=argValue] ...`')
+            except IndexError:
+                self._api.send_message(
+                    event['channel'],
+                    'API method missing.\nUsage: `api method [argName=argValue] ...`'
+                )
                 return
 
-            apiArgs={}
+            api_args = {}
 
             for arg in args:
                 key, val = arg.split('=')
                 if key is None or val is None:
-                    self._api.send_message(event['channel'], 'Invalid api argument: "{}"\nShould be in format "key=value"'.format(arg))
+                    self._api.send_message(
+                        event['channel'],
+                        'Invalid api argument: "{}"\nShould be in format "key=value"'.format(arg)
+                    )
                     return
-                apiArgs[key] = val
+                api_args[key] = val
 
             try:
-                response = self._api.custom_api_call(method, **apiArgs)
+                response = self._api.custom_api_call(method, **api_args)
             except SlackApiError as error:
                 self._api.send_message(event['channel'], 'API error: "{}"'.format(error.error))
             else:
@@ -176,10 +182,12 @@ class IdleRpgBot():
         self._api.send_message(channel_id, 'Hello from Python! :tada:')
 
 def set_online(users, user_id):
+    """Sets a user in the given collection as active"""
     users[user_id]['active'] = True
     users[user_id]['first_seen'] = time.time()
 
 def set_offline(users, user_id):
+    """Sets a user in the given collection as inactive"""
     users[user_id]['active'] = False
     users[user_id]['total'] += time.time() - users[user_id]['first_seen']
     users[user_id]['first_seen'] = None
