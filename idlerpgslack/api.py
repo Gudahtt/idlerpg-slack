@@ -1,3 +1,5 @@
+import logging
+
 from slackclient import SlackClient
 
 class SlackApiClient():
@@ -13,6 +15,13 @@ class SlackApiClient():
         if not response['ok']:
             raise SlackApiError(method, args, kwargs, response['error'])
 
+        if 'warning' in response:
+            logging.warning(
+                'API method %s, args: "%s", warning: "%s"',
+                method,
+                kwargs,
+                response['warning']
+            )
         return response
 
     def connect(self):
