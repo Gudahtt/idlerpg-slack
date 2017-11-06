@@ -72,7 +72,16 @@ class IdleRpgBot():
 
         rpg_channel = self._api.get_channel(self._rpg_channel_name)
         self._rpg_channel_id = rpg_channel['id']
-        self._update_all_users()
+
+        member_ids = self._api.get_channel_users(self._rpg_channel_id)
+        if not self._id in member_ids:
+            logging.warning('Bot is not in RPG channel "%s". Invite to allow game to proceed', self._rpg_channel_name)
+            self._api.send_message(
+                self._rpg_channel_name,
+                "Please invite me to this channel if you want to play IdleRPG!"
+            )
+        else:
+            self._update_all_users(member_ids)
 
     def _update_user(self, user_id):
         if not user_id in self._users:
@@ -104,6 +113,13 @@ class IdleRpgBot():
             self._handle_message(event)
         elif event['type'] == 'presence_change':
             self._handle_presence_change(event)
+        elif event['type'] == 'channel_joined':
+            if event['channel']['id'] == self._rpg_channel_id:
+                self._update_all_users(event['channel']['members'])
+                self._api.send_message(
+                    event['channel']['id'],
+                    'Thanks for the invite! IdleRPG has resumed.'
+                )
 
     def _handle_message(self, event):
         if not 'subtype' in event:
@@ -168,8 +184,9 @@ class IdleRpgBot():
                 self._api.send_message(event['channel'], 'API response: "{}"'.format(response))
 
 
-    def _update_all_users(self):
-        member_ids = self._api.get_channel_users(self._rpg_channel_id)
+    def _update_all_users(self, member_ids=None):
+        if member_ids is None:
+            member_ids = self._api.get_channel_users(self._rpg_channel_id)
 
         for member_id in member_ids:
             self._update_user(member_id)
