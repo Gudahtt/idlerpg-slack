@@ -136,6 +136,16 @@ class IdleRpgBot():
                     event['channel']['id'],
                     'Thanks for the invite! IdleRPG has resumed.'
                 )
+        elif event['type'] == 'channel_left':
+            if event['channel'] == self._rpg_channel_id:
+                self._active = False
+                for user_id, user in self._users.items():
+                    if user['active']:
+                        set_offline(self._users, user_id)
+                self._api.send_message(
+                    event['channel'],
+                    'IdleRPG has been paused. Invite me back into the channel to resume the game'
+                )
 
     def _handle_message(self, event):
         if not 'subtype' in event:
@@ -210,7 +220,8 @@ class IdleRpgBot():
 
 
     def _handle_presence_change(self, event):
-        self._update_user(event['user'])
+        if self._active:
+            self._update_user(event['user'])
 
     def _hello(self, channel_id):
         self._api.send_message(channel_id, 'Hello from Python! :tada:')
