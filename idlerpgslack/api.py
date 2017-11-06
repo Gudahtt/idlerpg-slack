@@ -11,7 +11,7 @@ class SlackApiClient():
         response = self._sc.api_call(method, *args, **kwargs)
 
         if not response['ok']:
-            raise RuntimeError('Error calling \'{}\', message: "{}"'.format(response['error']))
+            raise SlackApiError(method, args, kwargs, response)
 
         return response
 
@@ -78,3 +78,13 @@ class SlackApiClient():
     def get_self(self):
         """Returns information about the connected user"""
         return self._sc.server.login_data['self']
+
+class SlackApiError(Exception):
+    """Raise when a Slack API call results in an error response"""
+    def __init__(self, method, apiArgs, apiKwargs, response, *args):
+        self.method = method
+        self.apiArgs = apiArgs
+        self.apiKwargs = apiKwargs
+        self.response = response
+
+        super(SlackApiError, self).__init__('Error calling \'{}\', message: "{}"'.format(method, response['error']), method, apiArgs, apiKwargs, response, *args)

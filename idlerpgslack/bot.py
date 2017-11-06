@@ -137,6 +137,29 @@ class IdleRpgBot():
         elif command == 'load':
             self.load()
             self._update_all_users()
+        elif command == "api":
+            try:
+                method = args.pop(0)
+            except:
+                self._api.send_message(event['channel'], 'API method missing.\nUsage: `api method [argName=argValue] ...`')
+                return
+
+            apiArgs={}
+
+            for arg in args:
+                key, val = arg.split('=')
+                if key is None or val is None:
+                    self._api.send_message(event['channel'], 'Invalid api argument: "{}"\nShould be in format "key=value"'.format(arg))
+                    return
+                apiArgs[key] = val
+
+            try:
+                response = self._api._safe_web_call(method, **apiArgs)
+            except SlackApiError as e:
+                self._api.send_message(event['channel'], 'API error: "{}"'.format(e.response['error']))
+            else:
+                self._api.send_message(event['channel'], 'API response: "{}"'.format(response))
+
 
     def _update_all_users(self):
         member_ids = self._api.get_channel_users(self._rpg_channel_id)
