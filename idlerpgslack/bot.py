@@ -162,6 +162,7 @@ class IdleRpgBot():
             self._hello(event['channel'])
         elif command == 'scores':
             scores = []
+            self._update_all_users()
             for user in self._users.values():
                 name = user['profile']['display_name']
                 if not name:
