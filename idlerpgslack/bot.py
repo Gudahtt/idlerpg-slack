@@ -106,12 +106,13 @@ class IdleRpgBot():
             self._handle_presence_change(event)
 
     def _handle_message(self, event):
-        text = event['text']
-        if text.startswith('<@{}>'.format(self._id)):
-            chunks = text.split()
+        if not 'subtype' in event:
+            text = event['text']
+            if text.startswith('<@{}>'.format(self._id)):
+                chunks = text.split()
 
-            if len(chunks) > 1:
-                self._handle_command(event, chunks[1], chunks[2:])
+                if len(chunks) > 1:
+                    self._handle_command(event, chunks[1], chunks[2:])
 
     def _handle_command(self, event, command, args):
         command = command.lower()
