@@ -6,6 +6,9 @@ from .api import SlackApiClient, SlackApiError
 from . import db
 
 READ_EVENT_PAUSE = .1
+LEVEL_MULTIPLIER = 300
+LEVEL_EXPONENTIAL_FACTOR = 1.16
+UPDATE_INTERVAL = 5 * 60 # Update every 5 minutes
 
 class IdleRpgBot():
     """A Slack bot for playing IdleRPG. An IdleRPG Slack bot will track the
@@ -26,6 +29,7 @@ class IdleRpgBot():
         self._rpg_channel_name = rpg_channel_name
         self._db_filename = db_filename
         self._users = {}
+        self._active = False
 
         self.load()
 
@@ -34,11 +38,18 @@ class IdleRpgBot():
         self._api.connect()
         self._post_connection_init()
 
+        last_update = time.time()
         while True:
             events = self._api.read()
 
             for event in events:
                 self._handle_event(event)
+
+            if self._active:
+                current_time = time.time()
+                if current_time > last_update + UPDATE_INTERVAL:
+                    last_update = current_time
+                    self._update_all_users()
             time.sleep(READ_EVENT_PAUSE)
 
     def save(self):
@@ -81,6 +92,7 @@ class IdleRpgBot():
                 "Please invite me to this channel if you want to play IdleRPG!"
             )
         else:
+            self._active = True
             self._update_all_users(member_ids)
 
     def _update_user(self, user_id):
@@ -94,7 +106,9 @@ class IdleRpgBot():
                 'profile': user['profile'],
                 'active': False,
                 'first_seen': None,
-                'total': 0
+                'total': 0,
+                'current_level_total': 0,
+                'level': 0
             }
 
         active = self._api.is_user_active(user_id)
@@ -102,7 +116,8 @@ class IdleRpgBot():
         if active:
             if not self._users[user_id]['active']:
                 set_online(self._users, user_id)
-
+            else:
+                update_totals(self._users, user_id)
         else:
             if self._users[user_id]['active']:
                 set_offline(self._users, user_id)
@@ -115,6 +130,7 @@ class IdleRpgBot():
             self._handle_presence_change(event)
         elif event['type'] == 'channel_joined':
             if event['channel']['id'] == self._rpg_channel_id:
+                self._active = True
                 self._update_all_users(event['channel']['members'])
                 self._api.send_message(
                     event['channel']['id'],
@@ -143,11 +159,12 @@ class IdleRpgBot():
                 if not name:
                     name = user['profile']['email']
 
+                level = user['level']
                 total = user['total']
 
                 if user['active']:
                     total += time.time() - user['first_seen']
-                scores.append('{}: {}'.format(name, total))
+                scores.append('{}: level {}, idle time: {}'.format(name, level, total))
             self._api.send_message(event['channel'], 'Scores:\n{}'.format('\n'.join(scores)))
         elif command == 'save':
             self.save()
@@ -205,6 +222,30 @@ def set_online(users, user_id):
 
 def set_offline(users, user_id):
     """Sets a user in the given collection as inactive"""
+    current_time = time.time()
+    idle_time = current_time - users[user_id]['first_seen']
+
     users[user_id]['active'] = False
-    users[user_id]['total'] += time.time() - users[user_id]['first_seen']
+    users[user_id]['total'] += idle_time
+    users[user_id]['current_level_total'] += idle_time
     users[user_id]['first_seen'] = None
+
+    update_level(users, user_id)
+
+def update_totals(users, user_id):
+    """Updates the total time a user has been online"""
+    current_time = time.time()
+    idle_time = current_time - users[user_id]['first_seen']
+
+    users[user_id]['total'] += idle_time
+    users[user_id]['current_level_total'] += idle_time
+    users[user_id]['first_seen'] = current_time
+
+    update_level(users, user_id)
+
+def update_level(users, user_id):
+    """Checks whether a user has leveled up, and updates their level if so"""
+    next_level = LEVEL_MULTIPLIER * (LEVEL_EXPONENTIAL_FACTOR ** users[user_id]['level'])
+    if users[user_id]['current_level_total'] > next_level:
+        users[user_id]['current_level_total'] -= next_level
+        users[user_id]['level'] += 1
