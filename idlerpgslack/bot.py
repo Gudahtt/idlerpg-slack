@@ -56,6 +56,7 @@ class IdleRpgBot():
                 if current_time > last_update + UPDATE_INTERVAL:
                     last_update = current_time
                     self._update_all_users()
+                    self.save()
             time.sleep(READ_EVENT_PAUSE)
 
     def save(self):
