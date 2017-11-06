@@ -3,7 +3,8 @@ import logging
 import sys
 
 from dotenv import load_dotenv
-from bot import IdleRpgBot
+
+from .bot import IdleRpgBot
 
 def main():
     logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)

@@ -2,8 +2,8 @@ import copy
 import time
 import logging
 
-from api import SlackApiClient
-import db
+from .api import SlackApiClient, SlackApiError
+from . import db
 
 READ_EVENT_PAUSE = .1
 
