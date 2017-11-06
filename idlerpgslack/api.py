@@ -11,7 +11,7 @@ class SlackApiClient():
         response = self._sc.api_call(method, *args, **kwargs)
 
         if not response['ok']:
-            raise SlackApiError(method, args, kwargs, response)
+            raise SlackApiError(method, args, kwargs, response['error'])
 
         return response
 
@@ -23,6 +23,19 @@ class SlackApiClient():
     def read(self):
         """Read from the Websocket connection"""
         return self._sc.rtm_read()
+
+    def custom_api_call(self, method, *args, **kwargs):
+        """Custom API call specified at runtime"""
+        response = self._safe_web_call(method, *args, **kwargs)
+
+        del response['ok']
+        if 'args' in response:
+            if 'token' in response['args']:
+                del response['args']['token']
+            if not response['args']:
+                del response['args']
+
+        return response
 
     def get_channel(self, name):
         """Return the Slack channel with the given name."""
@@ -81,10 +94,10 @@ class SlackApiClient():
 
 class SlackApiError(Exception):
     """Raise when a Slack API call results in an error response"""
-    def __init__(self, method, apiArgs, apiKwargs, response, *args):
+    def __init__(self, method, apiArgs, apiKwargs, error, *args):
         self.method = method
         self.apiArgs = apiArgs
         self.apiKwargs = apiKwargs
-        self.response = response
+        self.error = error
 
-        super(SlackApiError, self).__init__('Error calling \'{}\', message: "{}"'.format(method, response['error']), method, apiArgs, apiKwargs, response, *args)
+        super(SlackApiError, self).__init__('Error calling \'{}\', message: "{}"'.format(method, error), method, apiArgs, apiKwargs, error, *args)

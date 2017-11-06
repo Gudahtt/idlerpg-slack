@@ -155,9 +155,9 @@ class IdleRpgBot():
                 apiArgs[key] = val
 
             try:
-                response = self._api._safe_web_call(method, **apiArgs)
-            except SlackApiError as e:
-                self._api.send_message(event['channel'], 'API error: "{}"'.format(e.response['error']))
+                response = self._api.custom_api_call(method, **apiArgs)
+            except SlackApiError as error:
+                self._api.send_message(event['channel'], 'API error: "{}"'.format(error.error))
             else:
                 self._api.send_message(event['channel'], 'API response: "{}"'.format(response))
 
