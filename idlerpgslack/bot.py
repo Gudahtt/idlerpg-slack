@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""IdleRPG Slack Bot
+
+An IdleRPG bot for Slack
+"""
+
 import copy
 import time
 import logging
@@ -296,6 +302,7 @@ def required_idle_time(level):
     return LEVEL_MULTIPLIER * (LEVEL_EXPONENTIAL_FACTOR ** level)
 
 def batch(iterable, batch_size=1):
+    """Split an iterable collection into batches"""
     length = len(iterable)
     for start_index in range(0, length, batch_size):
         yield iterable[start_index:min(start_index + batch_size, length)]

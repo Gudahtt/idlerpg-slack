@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""Bot Command-Line Interface
+
+Command-line interface for the IdleRPG Slack bot
+"""
+
 import os
 import logging
 

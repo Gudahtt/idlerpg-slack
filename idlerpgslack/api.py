@@ -1,10 +1,16 @@
+# -*- coding: utf-8 -*-
+"""Slack API Client
+
+Acts as a wrapper around the slack client library.
+"""
+
 import logging
 import re
 from json.decoder import JSONDecodeError
 
 from slackclient import SlackClient
 
-unfurl = re.compile('''<https?:.+?\|(.+?)>''')
+LINK_REGEX = re.compile(r'''<https?:.+?\|(.+?)>''')
 
 class SlackApiClient():
     """Slack API client"""
@@ -14,9 +20,9 @@ class SlackApiClient():
         self._sc = SlackClient(slack_token)
 
     def _safe_web_call(self, method, *args, **kwargs):
-        unfurl_match = unfurl.match(method)
-        if unfurl_match:
-            method = unfurl_match.group(1)
+        link_match = LINK_REGEX.match(method)
+        if link_match:
+            method = link_match.group(1)
 
         logging.debug(
             'API method %s, args: "%s"',
@@ -117,10 +123,17 @@ class SlackApiClient():
 
 class SlackApiError(Exception):
     """Raise when a Slack API call results in an error response"""
-    def __init__(self, method, apiArgs, apiKwargs, error, *args):
+    def __init__(self, method, api_args, api_kwargs, error, *args):
         self.method = method
-        self.apiArgs = apiArgs
-        self.apiKwargs = apiKwargs
+        self.api_args = api_args
+        self.api_kwargs = api_kwargs
         self.error = error
 
-        super(SlackApiError, self).__init__('Error calling \'{}\', message: "{}"'.format(method, error), method, apiArgs, apiKwargs, error, *args)
+        super(SlackApiError, self).__init__(
+            'Error calling \'{}\', message: "{}"'.format(method, error),
+            method,
+            api_args,
+            api_kwargs,
+            error,
+            *args
+        )

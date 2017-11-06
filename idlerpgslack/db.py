@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+"""Database API
+
+Handles data persistence for the IdleRPG Slack bot"""
+
 import os
 import pickle
 
