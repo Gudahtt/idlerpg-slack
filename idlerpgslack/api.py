@@ -1,4 +1,5 @@
 import logging
+from json.decoder import JSONDecodeError
 
 from slackclient import SlackClient
 
@@ -10,7 +11,15 @@ class SlackApiClient():
         self._sc = SlackClient(slack_token)
 
     def _safe_web_call(self, method, *args, **kwargs):
-        response = self._sc.api_call(method, *args, **kwargs)
+        logging.debug(
+            'API method %s, args: "%s"',
+            method,
+            kwargs
+        )
+        try:
+            response = self._sc.api_call(method, *args, **kwargs)
+        except JSONDecodeError:
+            raise SlackApiError(method, args, kwargs, 'Possible invalid method (JSONDecodeError)')
 
         if not response['ok']:
             raise SlackApiError(method, args, kwargs, response['error'])
