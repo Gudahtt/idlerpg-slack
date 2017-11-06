@@ -161,8 +161,8 @@ class IdleRpgBot():
         if command == 'hello' or command == 'hi':
             self._hello(event['channel'])
         elif command == 'scores':
-            scores = []
             self._update_all_users()
+            all_scores = []
             for user in self._users.values():
                 name = user['profile']['display_name']
                 if not name:
@@ -172,11 +172,40 @@ class IdleRpgBot():
 
                 level = user['level']
                 total = user['total']
+                current_level_total = user['current_level_total']
 
                 if user['active']:
-                    total += time.time() - user['first_seen']
-                scores.append('{}: level {}, idle time: {}'.format(name, level, total))
-            self._api.send_message(event['channel'], 'Scores:\n{}'.format('\n'.join(scores)))
+                    current_time = time.time()
+                    elapsed_time = current_time - user['first_seen']
+                    total += elapsed_time
+                    current_level_total += elapsed_time
+
+                ttl = required_idle_time(level) - current_level_total
+
+                all_scores.append({
+                    'user': name,
+                    'level': level,
+                    'total': total,
+                    'TTL': ttl
+                })
+            all_scores = sorted(
+                all_scores,
+                key=lambda score: (score['level'], score['total']),
+                reverse=True
+            )
+            for index, scores in enumerate(batch(all_scores, 20)):
+                if index == 0:
+                    self._api.send_message(
+                        event['channel'],
+                        'Scores:',
+                        list(map(score_attachment, scores))
+                    )
+                else:
+                    self._api.send_message(
+                        event['channel'],
+                        '',
+                        list(map(score_attachment, scores))
+                    )
         elif command == 'save':
             self.save()
         elif command == 'load':
@@ -256,8 +285,78 @@ def update_totals(users, user_id):
     update_level(users, user_id)
 
 def update_level(users, user_id):
-    """Checks whether a user has leveled up, and updates their level if so"""
-    next_level = LEVEL_MULTIPLIER * (LEVEL_EXPONENTIAL_FACTOR ** users[user_id]['level'])
+    """Checks whether a user has leveled up, and updates their level if so."""
+    next_level = required_idle_time(users[user_id]['level'])
     if users[user_id]['current_level_total'] > next_level:
         users[user_id]['current_level_total'] -= next_level
         users[user_id]['level'] += 1
+
+def required_idle_time(level):
+    """Calculates the idle time required for the given level."""
+    return LEVEL_MULTIPLIER * (LEVEL_EXPONENTIAL_FACTOR ** level)
+
+def batch(iterable, batch_size=1):
+    length = len(iterable)
+    for start_index in range(0, length, batch_size):
+        yield iterable[start_index:min(start_index + batch_size, length)]
+
+def score_attachment(score):
+    """Generate a score attachment from a score dictionary"""
+    ttl = elapsed_time_format(score['TTL'])
+    total = elapsed_time_format(score['total'])
+    return {
+        'fallback': '{}, level: {}, total: {}, time until next level: {}'.format(
+            score['user'],
+            score['level'],
+            total,
+            ttl
+        ),
+        'title': 'User: {}'.format(score['user']),
+        'fields': [
+            {
+                'title': 'Level',
+                'value': score['level'],
+                'short': True
+            },
+            {
+                'title': 'TTL',
+                'value': ttl,
+                'short': True
+            },
+            {
+                'title': 'Total Idle Time',
+                'value': total,
+                'short': False
+            }
+        ]
+    }
+
+def elapsed_time_format(seconds):
+    """Returns human readable string for elapsed time"""
+    negative = seconds < 0
+    seconds = abs(int(seconds))
+    periods = [
+        ('year', 60 * 60 * 24 * 365),
+        ('month', 60 * 60 * 24 * 30),
+        ('day', 60 * 60 * 24),
+        ('hour', 60 * 60),
+        ('minute', 60),
+        ('second', 1)
+    ]
+
+    strings = []
+    for period_name, period_seconds in periods:
+        if seconds >= period_seconds:
+            period_value, seconds = divmod(seconds, period_seconds)
+            if period_value == 1:
+                strings.append('{} {}'.format(period_value, period_name))
+            else:
+                strings.append('{} {}s'.format(period_value, period_name))
+
+    message = ', '.join(strings)
+    if not message:
+        message = "0 seconds"
+
+    if negative:
+        return 'Negative ' + message
+    return message

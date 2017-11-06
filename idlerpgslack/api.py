@@ -102,12 +102,13 @@ class SlackApiClient():
 
         return response['presence'] == 'active'
 
-    def send_message(self, channel_id, message):
+    def send_message(self, channel_id, message, attachments=None):
         """Sends a message to a Slack channel"""
         self._safe_web_call(
             'chat.postMessage',
             channel=channel_id,
-            text=message
+            text=message,
+            attachments=attachments
         )
 
     def get_self(self):
